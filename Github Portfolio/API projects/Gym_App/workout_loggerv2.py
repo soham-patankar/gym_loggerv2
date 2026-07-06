@@ -19,7 +19,7 @@ def save_workouts(workouts):
          json.dump(workouts,f,indent=2)
 
 def fetch_exercises(muscle_group):
-    API_KEY = "Enter-your-API-key-here" 
+    API_KEY = "eV1kaA1DnfPeMjuwxqu2LIclcIX1KYvSw9GMs22c" #eV1kaA1DnfPeMjuwxqu2LIclcIX1KYvSw9GMs22c
     url = f"https://api.api-ninjas.com/v1/exercises?muscle={muscle_group}"
     headers = {"X-Api-Key": API_KEY}
     
