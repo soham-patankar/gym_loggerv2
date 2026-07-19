@@ -1,22 +1,32 @@
 import sqlite3
 from datetime import date
-from workout_loggerv2 import fetch_exercises
+import requests
 
 DATABASE= "workouts.db"
 
 def init_db():
     connection= sqlite3.connect(DATABASE)
     cursor=connection.cursor()
-    cursor.execute("""
-          CREATE TABLE IF NOT EXISTS workouts(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            workout_date TEXT,
-            exercise TEXT,
-            sets INTEGER,
-            reps INTEGER,
-            weight REAL
-          )       
-    """)
+    
+    #WORKOUTS TABLE
+    cursor.execute("""CREATE TABLE IF NOT EXISTS workouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workout_name TEXT,
+    workout_date TEXT
+    )""")
+
+    #EXERCISES TABLE
+    cursor.execute("""CREATE TABLE IF NOT EXISTS exercises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workout_id INTEGER,
+    exercise TEXT,
+    sets INTEGER,
+    reps INTEGER,
+    weight REAL,
+    FOREIGN KEY (workout_id) REFERENCES workouts(id)
+    )""")
+
+
     connection.commit()
     connection.close()
 
@@ -46,24 +56,49 @@ def get_int(prompt):
         try:
             return int(input(prompt))
         except ValueError:
-            print("Please enter an Integer: ")       
+            print("Please enter an Integer: ")     
+
+def fetch_exercises(muscle_group):
+    API_KEY = "ehT3yOKKqPbW4afFzLhwOMoqu1KBb0WcoOpnR5Fj"
+    url = f"https://api.api-ninjas.com/v1/exercises?muscle={muscle_group}"
+    headers = {"X-Api-Key": API_KEY}
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        data = response.json()
+        if not data:
+            return None
+        for i, exercise in enumerate(data):
+            print(f"{i+1}. {exercise['name']}")
+        choice = int(input("Pick a number: "))
+        return data[choice - 1]["name"]
+    else:
+        print(f"API error: {response.status_code}")
+        return None              
 
 def add_workouts():
     connection= sqlite3.connect(DATABASE)
     cursor=connection.cursor()
+    workout_name=str(input("Enter the name of workout: "))
     workout_date=str(input("Enter the workout date: "))
     if not workout_date:
        workout_date=str(date.today())
+    cursor.execute("""INSERT INTO workouts(workout_name,workout_date) VALUES(?,?)""",(workout_name,workout_date))  
+    workout_id=cursor.lastrowid 
     while True:   
       muscle_group=str(input("Enter the muscle group: ")).strip()
       exercise=fetch_exercises(muscle_group)
-      if exercise is not None:
-         break
-      print("Please recheck and enter muscle name correctly")
-    sets=get_int("Enter the number of sets: ")
-    reps=get_int("Enter the number of reps: ")
-    weight=get_int("Enter the total weight lifted in kg: ")   
-    cursor.execute("""INSERT INTO workouts(workout_date,exercise,sets,reps,weight) VALUES(?,?,?,?,?)""",(workout_date,exercise,sets,reps,weight))
+      if exercise is None:
+        print("Please Enter Valid Muscle Group: ")
+        continue
+      sets=get_int("Enter the number of sets: ")
+      reps=get_int("Enter the number of reps: ")
+      weight=get_int("Enter the total weight lifted in kg: ")   
+      cursor.execute("""INSERT INTO exercises(workout_id,exercise,sets,reps,weight) VALUES(?,?,?,?,?)""",(workout_id,exercise,sets,reps,weight))
+      again=str(input("Do you want to add another exercise in the workout (Y/N)?"))
+      if again.upper()=="N":
+        break
     connection.commit()
     connection.close()
 
@@ -74,8 +109,21 @@ def view_workouts():
     cursor.execute("""SELECT * from workouts""")
     results=cursor.fetchall()
     for row in results:
-        print(f"[{row[0]}] {row[2]} | {row[3]}x{row[4]} @ {row[5]}kg on {row[1]}")
+        print(f"[{row[0]}] {row[1]}")
     connection.close()    
+    if results:
+       wid=int(input("Enter the workout ID to be viewed"))
+       if wid!=0:
+          view_exercises(wid)
+
+def view_exercises(workout_id):
+    connection=sqlite3.connect(DATABASE)
+    cursor=connection.cursor()
+    cursor.execute("SELECT * from exercises WHERE workout_id=?",(workout_id,))
+    reveal=cursor.fetchall()
+    for row in reveal:
+       print(f"[{row[0]}][{row[1]}]{row[2]} of {row[3]} sets for {row[4]} reps at {row[5]}kg")
+    connection.close()   
 
 def delete_workouts():
     connection=sqlite3.connect(DATABASE)    
